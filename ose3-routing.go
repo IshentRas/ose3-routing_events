@@ -9,6 +9,7 @@ import (
      "log"
      "net/http"
      "os"
+     "strconv"
 )
 
 var secret_path = "/run/secrets/kubernetes.io/serviceaccount/token"
@@ -69,26 +70,42 @@ func main() {
         object := u["object"].(map[string]interface{})
         metadata := object["metadata"].(map[string]interface{})
         spec := object["spec"].(map[string]interface{})
+        endpoint_name := spec["to"].(interface{}).(map[string]interface{})["name"]
+
         switch action {
              case "ADDED" : 
-                  response_api := init_connection("/api/v1/namespaces/" + metadata["namespace"].(string) + "/endpoints/" + metadata["name"].(string),string(secret_token))
+                  response_api := init_connection("/api/v1/namespaces/" + metadata["namespace"].(string) + "/endpoints/" + endpoint_name.(string) , string(secret_token))
                   body, err := ioutil.ReadAll(response_api.Body)
                   if err != nil {
                       panic(err)
                   }
+
                   var v map[string]interface{}
                   err = json.Unmarshal([]byte(body), &v)
                   if err != nil {
                       panic(err)
                   }
-                  fmt.Printf("\nCREATE NEW ROUTE\n")
+
+                  var pool_member []string
+                  var size_endpoint = len(v["subsets"].([]interface{})[0].(map[string]interface{})["addresses"].([]interface{}))
+                  
+                  PORT := strconv.Itoa(int(v["subsets"].([]interface{})[0].(map[string]interface{})["ports"].([]interface{})[0].(map[string]interface{})["port"].(float64)))
+ 
+                  for i := 0 ; i < size_endpoint ; i++ {
+                      IP   := v["subsets"].([]interface{})[0].(map[string]interface{})["addresses"].([]interface{})[i].(map[string]interface{})["ip"]
+                      pool_member = append(pool_member,IP.(string) + ":" + PORT)
+                  } 
+
+                  fmt.Printf("\nCREATE NEW ROUTE\n================\n")
                   fmt.Printf("APP = %v\n",metadata["name"])
                   fmt.Printf("NAMESPACE = %v\n",metadata["namespace"])
                   fmt.Printf("FQDN TO EXPOSE = %v\n",spec["host"])
-                  fmt.Printf("IP:PORT POOL MEMBER = %v:%v\n\n",v["subsets"].([]interface{})[0].(map[string]interface{})["addresses"].([]interface{})[0].(map[string]interface{})["ip"],v["subsets"].([]interface{})[0].(map[string]interface{})["ports"].([]interface{})[0].(map[string]interface{})["port"])
+                  fmt.Printf("NAME OF ENDPOINT = %v\n",endpoint_name)
+                  fmt.Printf("SIZE POOL MEMBER = %v\n",size_endpoint)
+                  fmt.Printf("POOL MEMBER = %v\n\n",pool_member)
 
              case "DELETED" :
-                  response_api := init_connection("/api/v1/namespaces/" + metadata["namespace"].(string) + "/endpoints/" + metadata["name"].(string),string(secret_token))
+                  response_api := init_connection("/api/v1/namespaces/" + metadata["namespace"].(string) + "/endpoints/" + endpoint_name.(string) , string(secret_token))
                   body, err := ioutil.ReadAll(response_api.Body)
                   if err != nil {
                       panic(err)
@@ -98,10 +115,10 @@ func main() {
                   if err != nil {
                       panic(err)
                   }
-                  fmt.Printf("\nDELETE EXISTING ROUTE\n")
+
+                  fmt.Printf("\nDELETE EXISTING ROUTE\n=====================\n")
                   fmt.Printf("APP = %v\n",metadata["name"])
                   fmt.Printf("NAMESPACE = %v\n",metadata["namespace"])
-                  fmt.Printf("IP:PORT POOL MEMBER = %v:%v\n\n",v["subsets"].([]interface{})[0].(map[string]interface{})["addresses"].([]interface{})[0].(map[string]interface{})["ip"],v["subsets"].([]interface{})[0].(map[string]interface{})["ports"].([]interface{})[0].(map[string]interface{})["port"])
         }
      } 
 }
