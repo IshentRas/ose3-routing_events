@@ -43,7 +43,7 @@ func init_connection(path_connection , secret string) *http.Response {
 func main() {
 
      if len(master_uri) < 1 {
-         log.Fatal("Could not read environment variable OPEN SHIFT_MASTER")
+         log.Fatal("Could not read environment variable \"OPENSHIFT_MASTER\"")
      }
 
      secret_token, err := ioutil.ReadFile(secret_path)
